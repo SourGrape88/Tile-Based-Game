@@ -1,5 +1,8 @@
 -- Tile Based Game
 
+-- Imported Tools 
+local Movement = require("movement")
+
 -- Define the Tile Size
 local tileSize = 64
 
@@ -56,7 +59,7 @@ function love.mousepressed(mx, my, button)
     -- If we clicked on the Player Unit, Select it 
     if tileX == playerUnit.x and tileY == playerUnit.y then
       selectedUnit = playerUnit 
-      reachable = calculateReachable(playerUnit)
+      reachable = Movement.calculateReachable(playerUnit, terrain)
     elseif selectedUnit and reachable and reachable[tileY] and reachable[tileY][tileX] ~= nil then
       -- Move the selected unit to the Clicked Tile
       selectedUnit.x = tileX 
@@ -70,66 +73,6 @@ end
 
 function love.update(dt)
   
-end
-
--- Calculates Which Tiles Can Be Reached 
-function calculateReachable(unit)
-  local result = {}
-
-  for y = 1, #terrain do
-  result[y] = {}
-  end
-
-  -- Queue for Flood-Fill (x, y, remainingMove)
-  local queue = {
-    -- {x, y, remainingMovement}
-    {unit.x, unit.y, unit.move}
-  }
-
-  -- Mark Starting Tile as Reachable 
-  result[unit.y][unit.x] = unit.move
-
-    -- Pull the Oldest Tile from the Queue
-  while #queue > 0 do
-    local node = table.remove(queue, 1)
-    local x, y, remaining = node[1], node[2], node[3]
-
-    -- Try 4 Directions (Up, Down, Left, Right)
-    -- Only Air Units can Move Diagonally 
-    local directions = {
-      {1, 0}, {-1, 0}, {0, 1}, {0,-1}
-    }
-
-    -- Try to Move 1 Tile in Each Direction 
-    for _, d in ipairs(directions) do
-      local nx = x + d[1]
-      local ny = y + d[2]
-
-    -- Bounds Check
-    if terrain[ny] and terrain[ny][nx] then
-      local tileType = terrain[ny][nx]
-      local cost = terrainCost[tileType]
-
-      -- remaining tiles after Cost has been calculated 
-      -- {x, y, remaining total movement - cost}
-      local newRemaining = remaining - cost 
-
-      if newRemaining >= 0 then -- If the Unit cant afford the tile, the path ends here 
-        -- Only Continue if we've never been here before
-        -- Or we reached it with more remaining movement than last time 
-        -- Prevents loops 
-        if result[ny][nx] == nil or newRemaining > result[ny][nx] then
-          -- Track the Best Movement for this tile
-          -- Continue expanding outward from it 
-          result[ny][nx] = newRemaining
-          table.insert(queue, {nx, ny, newRemaining})
-        end
-      end
-    end
-  end
-end
-  return result 
-
 end
 
 function love.draw()
