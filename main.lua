@@ -26,6 +26,14 @@ local terrain = {
   {1,1,1,1,1,1,1,1,1,1,1,1,1},
 }
 
+local terrainCost = {
+  [1] = 1, -- Grass 
+  [2] = 2, -- Forest
+  [3] = math.huge -- Mountain (impassable)
+}
+
+local reachable = nil 
+
 function love.load()
   love.window.setMode(800, 600)
   love.window.setTitle("Tile Based Game")
@@ -48,11 +56,13 @@ function love.mousepressed(mx, my, button)
     -- If we clicked on the Player Unit, Select it 
     if tileX == playerUnit.x and tileY == playerUnit.y then
       selectedUnit = playerUnit 
-    elseif selectedUnit then
+      reachable = calculateReachable(playerUnit)
+    elseif selectedUnit and reachable and reachable[tileY] and reachable[tileY][tileX] ~= nil then
       -- Move the selected unit to the Clicked Tile
       selectedUnit.x = tileX 
       selectedUnit.y = tileY 
       selectedUnit = nil -- Deselect after Moving
+      reachable = nil 
     end
   end
   
@@ -60,6 +70,66 @@ end
 
 function love.update(dt)
   
+end
+
+-- Calculates Which Tiles Can Be Reached 
+function calculateReachable(unit)
+  local result = {}
+
+  for y = 1, #terrain do
+  result[y] = {}
+  end
+
+  -- Queue for Flood-Fill (x, y, remainingMove)
+  local queue = {
+    -- {x, y, remainingMovement}
+    {unit.x, unit.y, unit.move}
+  }
+
+  -- Mark Starting Tile as Reachable 
+  result[unit.y][unit.x] = unit.move
+
+    -- Pull the Oldest Tile from the Queue
+  while #queue > 0 do
+    local node = table.remove(queue, 1)
+    local x, y, remaining = node[1], node[2], node[3]
+
+    -- Try 4 Directions (Up, Down, Left, Right)
+    -- Only Air Units can Move Diagonally 
+    local directions = {
+      {1, 0}, {-1, 0}, {0, 1}, {0,-1}
+    }
+
+    -- Try to Move 1 Tile in Each Direction 
+    for _, d in ipairs(directions) do
+      local nx = x + d[1]
+      local ny = y + d[2]
+
+    -- Bounds Check
+    if terrain[ny] and terrain[ny][nx] then
+      local tileType = terrain[ny][nx]
+      local cost = terrainCost[tileType]
+
+      -- remaining tiles after Cost has been calculated 
+      -- {x, y, remaining total movement - cost}
+      local newRemaining = remaining - cost 
+
+      if newRemaining >= 0 then -- If the Unit cant afford the tile, the path ends here 
+        -- Only Continue if we've never been here before
+        -- Or we reached it with more remaining movement than last time 
+        -- Prevents loops 
+        if result[ny][nx] == nil or newRemaining > result[ny][nx] then
+          -- Track the Best Movement for this tile
+          -- Continue expanding outward from it 
+          result[ny][nx] = newRemaining
+          table.insert(queue, {nx, ny, newRemaining})
+        end
+      end
+    end
+  end
+end
+  return result 
+
 end
 
 function love.draw()
@@ -96,13 +166,10 @@ end
 
 
   -- Draw Unit Selector
-  if selectedUnit then
-    for y = 1, tilesY do 
-      for x = 1, tilesX do 
-        local dx = math.abs(x - selectedUnit.x)
-        local dy = math.abs(y - selectedUnit.y)
-        
-        if dx + dy <= selectedUnit.move then 
+  if selectedUnit and reachable then
+    for y = 1, #terrain do 
+      for x = 1, #terrain[y] do
+        if reachable[y][x] ~= nil then   
           love.graphics.setColor(0.2, 0.4, 1, 1) -- Light Blue Highlight
           love.graphics.setLineWidth(8) -- 4 Pixels Thick
           love.graphics.rectangle(
@@ -113,6 +180,7 @@ end
             tileSize
           )
           love.graphics.setLineWidth(1)
+          print("Remaining move at tile: ", x, y, reachable[y][x])
         end 
       end 
     end
