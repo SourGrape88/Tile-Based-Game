@@ -1,5 +1,8 @@
 -- Tile Based Game
 
+-- Helper Files and Tools
+local Movement = require("movement")
+
 -- Define the Tile Size
 local tileSize = 64
 
@@ -26,6 +29,14 @@ local terrain = {
   {1,1,1,1,1,1,1,1,1,1,1,1,1},
 }
 
+local terrainCost = {
+  [1] = 1, -- Grass 
+  [2] = 2, -- Forest
+  [3] = math.huge -- Mountain (impassable)
+}
+
+local reachable = nil  
+
 function love.load()
   love.window.setMode(800, 600)
   love.window.setTitle("Tile Based Game")
@@ -48,11 +59,13 @@ function love.mousepressed(mx, my, button)
     -- If we clicked on the Player Unit, Select it 
     if tileX == playerUnit.x and tileY == playerUnit.y then
       selectedUnit = playerUnit 
-    elseif selectedUnit then
+      reachable = Movement.calculateReachable(playerUnit, terrain)
+    elseif selectedUnit and reachable and reachable[tileY] and reachable[tileY][tileX] ~= nil then
       -- Move the selected unit to the Clicked Tile
       selectedUnit.x = tileX 
       selectedUnit.y = tileY 
       selectedUnit = nil -- Deselect after Moving
+      reachable = nil 
     end
   end
   
@@ -61,6 +74,9 @@ end
 function love.update(dt)
   
 end
+
+-- Calculates Which Tiles Can Be Reached 
+
 
 function love.draw()
   for y = 1, #terrain do 
@@ -96,13 +112,10 @@ end
 
 
   -- Draw Unit Selector
-  if selectedUnit then
-    for y = 1, tilesY do 
-      for x = 1, tilesX do 
-        local dx = math.abs(x - selectedUnit.x)
-        local dy = math.abs(y - selectedUnit.y)
-        
-        if dx + dy <= selectedUnit.move then 
+  if selectedUnit and reachable then
+    for y = 1, #terrain do 
+      for x = 1, #terrain[y] do
+        if reachable[y][x] ~= nil then   
           love.graphics.setColor(0.2, 0.4, 1, 1) -- Light Blue Highlight
           love.graphics.setLineWidth(8) -- 4 Pixels Thick
           love.graphics.rectangle(
@@ -113,6 +126,7 @@ end
             tileSize
           )
           love.graphics.setLineWidth(1)
+          print("Remaining move at tile: ", x, y, reachable[y][x])
         end 
       end 
     end
