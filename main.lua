@@ -3,24 +3,6 @@
 -- Imported Tools 
 local Movement = require("movement")
 
--- Parent Path Helper (UI-side)
--- Build a Path from this Unit to this Hovered Tile
--- tx, ty = TargetX Coordinate and TargetY Coordinate
-local function buildPath(cameFrom, tx, ty)
-  local path = {}
-
-  -- While this Tile has a Recorded Previous Tile...
-  while cameFrom[ty] and cameFrom[ty][tx] do
-    -- Insert Tile before the Hovered Tile 
-    table.insert(path, 1, { x = tx, y = ty })
-    local prev = cameFrom[ty][tx]
-    -- Move One Step Backwards
-    tx, ty = prev[1], prev[2]
-  end
-  -- Return the Final Path 
-  return path
-end
-
 -- Define the Tile Size
 local tileSize = 64
 
@@ -180,7 +162,7 @@ end
   )
 
   if selectedUnit and reachable and reachable[hoverTileY] and reachable[hoverTileY][hoverTileX] then
-    hoverPath = buildPath(cameFrom, hoverTileX, hoverTileY)
+    hoverPath = Movement.buildPath(cameFrom, hoverTileX, hoverTileY)
   else 
     hoverPath = nil 
   end
