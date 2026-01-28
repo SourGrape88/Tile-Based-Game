@@ -3,6 +3,24 @@
 -- Imported Tools 
 local Movement = require("movement")
 
+-- Parent Path Helper (UI-side)
+-- Build a Path from this Unit to this Hovered Tile
+-- tx, ty = TargetX Coordinate and TargetY Coordinate
+local function buildPath(cameFrom, tx, ty)
+  local path = {}
+
+  -- While this Tile has a Recorded Previous Tile...
+  while cameFrom[ty] and cameFrom[ty][tx] do
+    -- Insert Tile before the Hovered Tile 
+    table.insert(path, 1, { x = tx, y = ty })
+    local prev = cameFrom[ty][tx]
+    -- Move One Step Backwards
+    tx, ty = prev[1], prev[2]
+  end
+  -- Return the Final Path 
+  return path
+end
+
 -- Define the Tile Size
 local tileSize = 64
 
@@ -12,7 +30,9 @@ local tilesX, tilesY
 local playerUnit = {x=3, y=3, move=4, color={0, 0, 1}}
 local enemyUnit = {x=5, y=5, color={0.9, 0, 0.3}}
 local selectedUnit = nil -- Currently Selected Unit
-
+local hoverPath = nil  -- Shows the Path when hovering
+local reachable = nil
+local cameFrom = nil 
 -- 1 = Grass
 -- 2 = Forest
 -- 3 = Mountain
@@ -33,9 +53,7 @@ local terrainCost = {
   [1] = 1, -- Grass 
   [2] = 2, -- Forest
   [3] = math.huge -- Mountain (impassable)
-}
-
-local reachable = nil 
+} 
 
 function love.load()
   love.window.setMode(800, 600)
@@ -59,8 +77,9 @@ function love.mousepressed(mx, my, button)
     -- If we clicked on the Player Unit, Select it 
     if tileX == playerUnit.x and tileY == playerUnit.y then
       selectedUnit = playerUnit 
-      reachable = Movement.calculateReachable(playerUnit, terrain)
+      reachable, cameFrom = Movement.calculateReachable(playerUnit, terrain)
     elseif selectedUnit and reachable and reachable[tileY] and reachable[tileY][tileX] ~= nil then
+      -- Only IF the Tile is Reachable 
       -- Move the selected unit to the Clicked Tile
       selectedUnit.x = tileX 
       selectedUnit.y = tileY 
@@ -139,7 +158,8 @@ end
   )
   
   -- Mouse to Tile Coordinates 
-  local mx, my = love.mouse.getPosition()
+  local mx, my = love.mouse.getPosition() -- Get Mouse Coordinates
+  -- Convert Mouse Position to Tile Position 
   local hoverTileX = math.floor(mx / tileSize) + 1 
   local hoverTileY = math.floor(my / tileSize) + 1 
 
@@ -158,6 +178,27 @@ end
       tileSize,
       tileSize
   )
+
+  if selectedUnit and reachable and reachable[hoverTileY] and reachable[hoverTileY][hoverTileX] then
+    hoverPath = buildPath(cameFrom, hoverTileX, hoverTileY)
+  else 
+    hoverPath = nil 
+  end
+
+  -- Draw Hovering Path 
+  if hoverPath then
+    for _, node in ipairs(hoverPath) do
+      love.graphics.setColor(1, 1, 0, 0.6) -- Yellow, Semi-Transparent
+      love.graphics.rectangle(
+        "fill",
+        (node.x - 1) * tileSize,
+        (node.y - 1) * tileSize,
+        tileSize,
+        tileSize
+      )
+      print(i, node.x, node.y)
+    end
+  end
 
   -- Reset the Color so future drawings aren't tinted
   love.graphics.setColor(1, 1, 1, 1)
