@@ -10,9 +10,11 @@ local terrainCost = {
 
 function Movement.calculateReachable(unit, terrain)
   local result = {}
+  local cameFrom = {} -- Tracks Path History
 
   for y = 1, #terrain do
-  result[y] = {}
+    result[y] = {}
+    cameFrom[y] = {} 
   end
 
   -- Queue for Flood-Fill (x, y, remainingMove)
@@ -23,6 +25,7 @@ function Movement.calculateReachable(unit, terrain)
 
   -- Mark Starting Tile as Reachable 
   result[unit.y][unit.x] = unit.move
+  cameFrom[unit.y][unit.x] = nil -- Starting Tile Has No Parent (Previous Tile)
 
     -- Pull the Oldest Tile from the Queue
   while #queue > 0 do
@@ -57,13 +60,16 @@ function Movement.calculateReachable(unit, terrain)
           -- Track the Best Movement for this tile
           -- Continue expanding outward from it 
           result[ny][nx] = newRemaining
+            -- What Tile did I Come From 
+            cameFrom[ny][nx] = {x, y}
+
           table.insert(queue, {nx, ny, newRemaining})
         end
       end
     end
   end
 end
-  return result 
+  return result, cameFrom 
 
 end
 
