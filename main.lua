@@ -9,7 +9,17 @@ local tileSize = 64
 -- Number of tiles in x and y directions
 local tilesX, tilesY
 
-local playerUnit = {x=3, y=3, move=4, color={0, 0, 1}}
+local playerUnit = {
+  x=3, 
+  y=3, 
+  move=4, 
+  color={0, 0, 1},
+  isMoving = false,
+  path = nil, -- Path that Unit will Walk 
+  pathIndex = 1, -- Current Step in the Path 
+  moveDelay = 0.25, -- Time Between Steps 
+  moveTimer = 0 -- Counts Time 
+}
 local enemyUnit = {x=5, y=5, color={0.9, 0, 0.3}}
 local selectedUnit = nil -- Currently Selected Unit
 local hoverPath = nil  -- Shows the Path when hovering
@@ -60,20 +70,48 @@ function love.mousepressed(mx, my, button)
     if tileX == playerUnit.x and tileY == playerUnit.y then
       selectedUnit = playerUnit 
       reachable, cameFrom = Movement.calculateReachable(playerUnit, terrain)
-    elseif selectedUnit and reachable and reachable[tileY] and reachable[tileY][tileX] ~= nil then
       -- Only IF the Tile is Reachable 
       -- Move the selected unit to the Clicked Tile
-      selectedUnit.x = tileX 
-      selectedUnit.y = tileY 
+    elseif selectedUnit and reachable and reachable[tileY] and reachable[tileY][tileX] ~= nil then
+      selectedUnit.path = Movement.buildPath(cameFrom, tileX, tileY) -- Save the Best Path 
+      selectedUnit.pathIndex = 1 -- Start at the Beginning of the Path 
+      selectedUnit.isMoving = true -- Change State To "Moving"
       selectedUnit = nil -- Deselect after Moving
-      reachable = nil 
+      reachable = nil -- Prevents Input During Movement 
     end
   end
   
 end
 
 function love.update(dt)
-  
+  -- If the Unit is Moving... 
+  if playerUnit.isMoving then 
+    -- Start the moveTimer 
+    playerUnit.moveTimer = playerUnit.moveTimer + dt
+    -- If The Unit has Passed the Delay Timer...
+    if playerUnit.moveTimer >= playerUnit.moveDelay then
+      -- Reset the Timer 
+      playerUnit.moveTimer = 0
+
+    -- Grab the Next Tile in the Path 
+    local node = playerUnit.path[playerUnit.pathIndex]
+
+      -- If there is Another Step in the Path...
+      if node then
+        -- Move the Unit to the Tile 
+        playerUnit.x = node.x 
+        playerUnit.y = node.y 
+        -- Update the Unit's Path Index 
+        playerUnit.pathIndex = playerUnit.pathIndex + 1
+      else 
+        -- If the Path is Finished
+        -- Update "isMoving" state 
+        playerUnit.isMoving = false 
+        -- Reset Path 
+        playerUnit.path = nil 
+      end
+    end
+  end
 end
 
 function love.draw()
