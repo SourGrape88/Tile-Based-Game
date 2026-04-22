@@ -9,17 +9,36 @@ local tileSize = 64
 -- Number of tiles in x and y directions
 local tilesX, tilesY
 
-local playerUnit = {
+local currentTurn = "player" -- "player" or "enemy"
+
+local playerUnits = {
+    {
   x=3, 
   y=3, 
   move=4, 
   color={0, 0, 1},
   isMoving = false,
+  hasMoved = false,
   path = nil, -- Path that Unit will Walk 
   pathIndex = 1, -- Current Step in the Path 
   moveDelay = 0.25, -- Time Between Steps 
   moveTimer = 0 -- Counts Time 
+},
+    {
+      x=4, 
+      y=3, 
+      move=3, 
+      color={0, 0.5, 1},
+      isMoving = false,
+      hasMoved = false,
+      path = nil, -- Path that Unit will Walk 
+      pathIndex = 1, -- Current Step in the Path 
+      moveDelay = 0.25, -- Time Between Steps 
+      moveTimer = 0 -- Counts Time 
+    }
 }
+
+
 local enemyUnit = {x=5, y=5, color={0.9, 0, 0.3}}
 local selectedUnit = nil -- Currently Selected Unit
 local hoverPath = nil  -- Shows the Path when hovering
@@ -61,18 +80,24 @@ function love.load()
 end
 
 function love.mousepressed(mx, my, button)
-  if button == 1 then
+  
+    if button == 1 then
     -- Convert Mouse Coordinates to Tile Coordinates
     local tileX = math.floor(mx / tileSize) + 1
     local tileY = math.floor(my / tileSize) + 1 
   
-    -- If we clicked on the Player Unit, Select it 
-    if tileX == playerUnit.x and tileY == playerUnit.y then
-      selectedUnit = playerUnit 
-      reachable, cameFrom = Movement.calculateReachable(playerUnit, terrain)
+    -- Loop through all Player Units 
+    for _, unit in ipairs(playerUnits) do
+        if currentTurn == "player" and tileX == unit.x and tileY == unit.y and not unit.hasMoved then
+            selectedUnit = unit
+            reachable, cameFrom = Movement.calculateReachable(unit, terrain)
+            return
+        end
+
+    end
       -- Only IF the Tile is Reachable 
       -- Move the selected unit to the Clicked Tile
-    elseif selectedUnit and reachable and reachable[tileY] and reachable[tileY][tileX] ~= nil then
+    if selectedUnit and reachable and reachable[tileY] and reachable[tileY][tileX] ~= nil then
       selectedUnit.path = Movement.buildPath(cameFrom, tileX, tileY) -- Save the Best Path 
       selectedUnit.pathIndex = 1 -- Start at the Beginning of the Path 
       selectedUnit.isMoving = true -- Change State To "Moving"
@@ -85,33 +110,71 @@ end
 
 function love.update(dt)
   -- If the Unit is Moving... 
-  if playerUnit.isMoving then 
-    -- Start the moveTimer 
-    playerUnit.moveTimer = playerUnit.moveTimer + dt
-    -- If The Unit has Passed the Delay Timer...
-    if playerUnit.moveTimer >= playerUnit.moveDelay then
-      -- Reset the Timer 
-      playerUnit.moveTimer = 0
+  for _, unit in ipairs(playerUnits) do
+      if unit.isMoving then 
+        -- Start the moveTimer 
+        unit.moveTimer = unit.moveTimer + dt
+        -- If The Unit has Passed the Delay Timer...
+        if unit.moveTimer >= unit.moveDelay then
+          -- Reset the Timer 
+          unit.moveTimer = 0
 
-    -- Grab the Next Tile in the Path 
-    local node = playerUnit.path[playerUnit.pathIndex]
+        -- Grab the Next Tile in the Path 
+        local node = unit.path[unit.pathIndex]
 
-      -- If there is Another Step in the Path...
-      if node then
-        -- Move the Unit to the Tile 
-        playerUnit.x = node.x 
-        playerUnit.y = node.y 
-        -- Update the Unit's Path Index 
-        playerUnit.pathIndex = playerUnit.pathIndex + 1
-      else 
-        -- If the Path is Finished
-        -- Update "isMoving" state 
-        playerUnit.isMoving = false 
-        -- Reset Path 
-        playerUnit.path = nil 
-      end
+          -- If there is Another Step in the Path...
+          if node then
+            -- Move the Unit to the Tile 
+            unit.x = node.x 
+            unit.y = node.y 
+            -- Update the Unit's Path Index 
+            unit.pathIndex = unit.pathIndex + 1
+          else 
+            -- If the Path is Finished
+            -- Update "isMoving" state 
+            unit.isMoving = false 
+            -- Reset Path 
+            unit.path = nil 
+            unit.hasMoved = true
+
+            endTurn()
+          end
+        end
+        end
     end
-  end
+end
+
+function startPlayerTurn()
+    for _, unit in ipairs(playerUnits) do
+        unit.hasMoved = false
+    end
+end
+
+function startEnemyTurn()
+    enemyAct()
+    --endTurn()
+end
+
+function enemyAct()
+    -- Do Nothing for now
+    print("Enemy Turn...")
+end
+
+function endTurn()
+    if currentTurn == "player" then
+        currentTurn = "enemy"
+        startEnemyTurn()
+    else
+        currentTurn = "player"
+        startPlayerTurn()
+    end
+end
+
+-- END TURN -------------------------------------
+function love.keypressed(key)
+    if key == "space" then
+        endTurn()
+    end
 end
 
 function love.draw()
@@ -167,16 +230,17 @@ end
       end 
     end
   end 
-  -- Draw Player Unit 
-  love.graphics.setColor(playerUnit.color)
-  love.graphics.rectangle(
-    "fill",
-    (playerUnit.x - 1) * tileSize, 
-    (playerUnit.y - 1) * tileSize,
-    tileSize,
-    tileSize
-  )
-  
+  -- Draw Player Unit
+  for _, unit in ipairs(playerUnits) do
+      love.graphics.setColor(unit.color)
+      love.graphics.rectangle(
+        "fill",
+        (unit.x - 1) * tileSize, 
+        (unit.y - 1) * tileSize,
+        tileSize,
+        tileSize
+      )
+  end 
   -- Mouse to Tile Coordinates 
   local mx, my = love.mouse.getPosition() -- Get Mouse Coordinates
   -- Convert Mouse Position to Tile Position 
@@ -219,6 +283,11 @@ end
       print(i, node.x, node.y)
     end
   end
+
+    
+  --Show Turn----------
+  love.graphics.setColor(1, 1, 1, 1)
+  love.graphics.print("Turn: " .. currentTurn, 10, 30)
 
   -- Reset the Color so future drawings aren't tinted
   love.graphics.setColor(1, 1, 1, 1)
