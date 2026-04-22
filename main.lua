@@ -11,12 +11,17 @@ local tilesX, tilesY
 
 local currentTurn = "player" -- "player" or "enemy"
 
+local combatLog = ""
+
 local playerUnits = {
     {
-  x=3, 
-  y=3, 
-  move=4, 
-  color={0, 0, 1},
+  x = 3, 
+  y = 3, 
+  move = 4, 
+  hp = 10,
+  attack = 3,
+  range = 1,
+  color = {0, 0, 1},
   isMoving = false,
   hasMoved = false,
   path = nil, -- Path that Unit will Walk 
@@ -25,10 +30,13 @@ local playerUnits = {
   moveTimer = 0 -- Counts Time 
 },
     {
-      x=4, 
-      y=3, 
-      move=3, 
-      color={0, 0.5, 1},
+      x = 4, 
+      y = 3, 
+      move = 3,
+      hp = 10,
+      attack = 3,
+      range = 1,
+      color = {0, 0.5, 1},
       isMoving = false,
       hasMoved = false,
       path = nil, -- Path that Unit will Walk 
@@ -39,7 +47,11 @@ local playerUnits = {
 }
 
 
-local enemyUnit = {x=5, y=5, color={0.9, 0, 0.3}}
+local enemyUnits = {
+    {x=5, y=5, hp=10, attack=2, range=1, color={0.9, 0, 0.3}},
+    {x=7, y=6, hp=10, attack=2, range=1, color={0.9, 0, 0.3}},
+}
+--local enemyUnits = {enemyUnit}
 local selectedUnit = nil -- Currently Selected Unit
 local hoverPath = nil  -- Shows the Path when hovering
 local reachable = nil
@@ -80,44 +92,79 @@ function love.load()
 end
 
 function love.mousepressed(mx, my, button)
-  
-    if button == 1 then
-    -- Convert Mouse Coordinates to Tile Coordinates
-    local tileX = math.floor(mx / tileSize) + 1
-    local tileY = math.floor(my / tileSize) + 1 
-  
-    -- Loop through all Player Units 
-    for _, unit in ipairs(playerUnits) do
-        if currentTurn == "player" and tileX == unit.x and tileY == unit.y and not unit.hasMoved then
-            selectedUnit = unit
-            reachable, cameFrom = Movement.calculateReachable(unit, terrain)
-            return
-        end
+if button ~= 1 then return end
 
+local tileX = math.floor(mx / tileSize) + 1
+local tileY = math.floor(my / tileSize) + 1
+
+-- 1. CHECK ATTACK FIRST (important!)
+if selectedUnit then
+    for _, enemy in ipairs(enemyUnits) do
+        if enemy.x == tileX and enemy.y == tileY then
+            
+            if isAdjacent(selectedUnit, enemy) then
+                enemy.hp = (enemy.hp or 10) - selectedUnit.attack
+
+                combatLog = "ATTACK! Enemy HP: " .. enemy.hp
+                print(combatLog)
+
+                for i, enemy in ipairs(enemyUnits) do
+                    if enemy.hp <= 0 then
+                        table.remove(enemyUnits, i) 
+                        combatLog = "Enemy Destroyed!"
+                        break
+                    end
+                end
+
+                selectedUnit.hasMoved = true
+                selectedUnit = nil
+                reachable = nil
+                return
+            else
+                combatLog = "Too far to attack!"
+                print(combatLog)
+                return
+            end
+        end
     end
-      -- Only IF the Tile is Reachable 
-      -- Move the selected unit to the Clicked Tile
-    if selectedUnit and reachable and reachable[tileY] and reachable[tileY][tileX] ~= nil then
-      selectedUnit.path = Movement.buildPath(cameFrom, tileX, tileY) -- Save the Best Path 
-      selectedUnit.pathIndex = 1 -- Start at the Beginning of the Path 
-      selectedUnit.isMoving = true -- Change State To "Moving"
-      selectedUnit = nil -- Deselect after Moving
-      reachable = nil -- Prevents Input During Movement 
+end
+
+-- 2. SELECT UNIT
+for _, unit in ipairs(playerUnits) do
+    if currentTurn == "player"
+        and tileX == unit.x
+        and tileY == unit.y
+        and not unit.hasMoved then
+
+        selectedUnit = unit
+        reachable, cameFrom = Movement.calculateReachable(unit, terrain)
+        return
     end
-  end
-  
+end
+
+-- 3. MOVE UNIT
+if selectedUnit and reachable and reachable[tileY] and reachable[tileY][tileX] then
+    selectedUnit.path = Movement.buildPath(cameFrom, tileX, tileY)
+    selectedUnit.pathIndex = 1
+    selectedUnit.isMoving = true
+
+    selectedUnit = nil
+    reachable = nil
+end
 end
 
 function love.update(dt)
   -- If the Unit is Moving... 
   for _, unit in ipairs(playerUnits) do
-      if unit.isMoving then 
-        -- Start the moveTimer 
-        unit.moveTimer = unit.moveTimer + dt
-        -- If The Unit has Passed the Delay Timer...
-        if unit.moveTimer >= unit.moveDelay then
-          -- Reset the Timer 
-          unit.moveTimer = 0
+     unit.moveTimer = unit.moveTimer or 0 
+     unit.moveDelay = unit.moveDelay or 0.25 
+     
+     if unit.isMoving then
+        unit.moveTimer = unit.moveTimer + dt 
+
+        if unit.moveTimer >= unit.moveDelay then 
+            unit.moveTimer = 0
+     
 
         -- Grab the Next Tile in the Path 
         local node = unit.path[unit.pathIndex]
@@ -136,11 +183,16 @@ function love.update(dt)
             -- Reset Path 
             unit.path = nil 
             unit.hasMoved = true
+            
+            if allUnitsMoved(playerUnits) then
+                endTurn()
+            end
+        end
+        end
+    end
 
-            endTurn()
-          end
-        end
-        end
+    --if enemyUnit.hp <= 0 then
+        --print("Enemy defeated!")
     end
 end
 
@@ -160,6 +212,19 @@ function enemyAct()
     print("Enemy Turn...")
 end
 
+function allUnitsMoved(units)
+    for _, unit in ipairs(units) do
+        if not unit.hasMoved then
+            return false
+        end
+    end
+    return true
+end
+
+function isAdjacent(a, b)
+    return math.abs(a.x - b.x) + math.abs(a.y - b.y) == 1 
+end
+
 function endTurn()
     if currentTurn == "player" then
         currentTurn = "enemy"
@@ -176,6 +241,8 @@ function love.keypressed(key)
         endTurn()
     end
 end
+
+
 
 function love.draw()
   for y = 1, #terrain do 
@@ -254,14 +321,16 @@ end
   
 
   -- Draw Enemy Unit 
-  love.graphics.setColor(enemyUnit.color)
-  love.graphics.rectangle(
-    "fill",
-      (enemyUnit.x - 1) * tileSize,
-      (enemyUnit.y - 1) * tileSize,
-      tileSize,
-      tileSize
-  )
+  for _, enemy in ipairs(enemyUnits) do
+      love.graphics.setColor(enemy.color)
+      love.graphics.rectangle(
+        "fill",
+          (enemy.x - 1) * tileSize,
+          (enemy.y - 1) * tileSize,
+          tileSize,
+          tileSize
+      )
+  end
 
   if selectedUnit and reachable and reachable[hoverTileY] and reachable[hoverTileY][hoverTileX] then
     hoverPath = Movement.buildPath(cameFrom, hoverTileX, hoverTileY)
@@ -284,10 +353,12 @@ end
     end
   end
 
-    
+--love.graphics.print("unit.moveTimer: " .. unit.moveTimer, 10, 50)
+--love.graphics.print("unit.moveDelay: " .. unit.moveDelay, 10, 50)
   --Show Turn----------
   love.graphics.setColor(1, 1, 1, 1)
   love.graphics.print("Turn: " .. currentTurn, 10, 30)
+  love.graphics.print("Log: " .. combatLog, 10, 50)
 
   -- Reset the Color so future drawings aren't tinted
   love.graphics.setColor(1, 1, 1, 1)
