@@ -140,7 +140,7 @@ for _, unit in ipairs(playerUnits) do
         and not unit.hasMoved then
 
         selectedUnit = unit
-        reachable, cameFrom = Movement.calculateReachable(unit, terrain)
+        reachable, cameFrom = Movement.calculateReachable(unit, terrain, playerUnits, enemyUnits)
         attackable = Movement.calculateAttackable(unit, terrain)
         return
     end

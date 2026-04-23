@@ -9,7 +9,27 @@ local terrainCost = {
     [3] = math.huge -- Mountain
 }
 
-function Movement.calculateReachable(unit, terrain)
+local function isEnemyAt(x, y, enemyUnits)
+    for _, e in ipairs(enemyUnits) do
+        if e.x == x and e.y == y then
+            return true
+        end
+    end
+    return false
+end
+
+local function isAllyAt(x, y, playerUnits, unit)
+    for _, u in ipairs(playerUnits) do
+        if u ~= unit and u.x == x and u.y == y then
+            return true
+        end
+    end
+
+    return false
+end
+
+
+function Movement.calculateReachable(unit, terrain, playerUnits, enemyUnits)
   local result = {}
   local cameFrom = {} -- Tracks Path History
 
@@ -56,18 +76,36 @@ function Movement.calculateReachable(unit, terrain)
       if newRemaining >= 0 then -- If the Unit cant afford the tile, the path ends here 
         -- Only Continue if we've never been here before
         -- Or we reached it with more remaining movement than last time 
+       if isEnemyAt(nx, ny, enemyUnits) then
+        goto continue
+       end
+
         -- Prevents loops 
         if result[ny][nx] == nil or newRemaining > result[ny][nx] then
           -- Track the Best Movement for this tile
           -- Continue expanding outward from it 
-          result[ny][nx] = newRemaining
-            -- What Tile did I Come From 
-            cameFrom[ny][nx] = {x, y}
+          -- Allow Allies to Pass through but do not allow stopping
+            local isAlly = isAllyAt(nx, ny, playerUnits, unit)
 
-          table.insert(queue, {nx, ny, newRemaining})
+            --cameFrom[nx][ny] = {x, y}
+            
+            -- Only Mark as Reachable if NOT Ally
+            if not isAlly then
+                result[ny][nx] = newRemaining
+                -- What Tile did I Come From 
+                cameFrom[ny][nx] = {x, y}
+            end
+
+            table.insert(queue, {nx, ny, newRemaining})
+
+          -- Remove from "reachable tiles" if it's an ally tile 
+          if isAlly then
+            result[ny][nx] = nil
+          end
         end
       end
     end
+    ::continue::
   end
 end
   return result, cameFrom 
