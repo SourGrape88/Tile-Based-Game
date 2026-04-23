@@ -1,3 +1,4 @@
+-- MOVEMENT.lUA --------------------------------------------------------------
 -- If it answers “where can a unit move?” it goes in movement.lua
 
 local Movement = {}
@@ -71,6 +72,30 @@ function Movement.calculateReachable(unit, terrain)
 end
   return result, cameFrom 
 
+end
+
+function Movement.calculateAttackable(unit, terrain)
+    local result = {}
+
+    -- Initialize Grid
+    for y = 1, #terrain do
+        result[y] = {}
+    end
+
+    -- Loop over the Entire Map
+    for y = 1, #terrain do
+        for x = 1, #terrain[y] do
+            -- Manhattan Distance from Unit
+            local dist = math.abs(unit.x - x) + math.abs(unit.y - y)
+            
+            -- If distance is inside attack range
+            if dist <= unit.range and dist > 0 then
+                result[y][x] = true -- Mark Tile as Attackable
+            end
+        end
+    end
+
+    return result 
 end
 
 -- Parent Path Helper (UI-side)

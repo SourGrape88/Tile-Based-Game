@@ -1,4 +1,4 @@
--- Tile Based Game
+-- Tile Based Game (main.lua) ------------------------------------------
 
 -- Imported Tools 
 local Movement = require("movement")
@@ -24,6 +24,7 @@ local playerUnits = {
   color = {0, 0, 1},
   isMoving = false,
   hasMoved = false,
+  hasActed = false,
   path = nil, -- Path that Unit will Walk 
   pathIndex = 1, -- Current Step in the Path 
   moveDelay = 0.25, -- Time Between Steps 
@@ -55,6 +56,7 @@ local enemyUnits = {
 local selectedUnit = nil -- Currently Selected Unit
 local hoverPath = nil  -- Shows the Path when hovering
 local reachable = nil
+local attackable = nil
 local cameFrom = nil 
 -- 1 = Grass
 -- 2 = Forest
@@ -91,6 +93,7 @@ function love.load()
 
 end
 
+-- UNIT SELECTION -------------------------
 function love.mousepressed(mx, my, button)
 if button ~= 1 then return end
 
@@ -98,7 +101,7 @@ local tileX = math.floor(mx / tileSize) + 1
 local tileY = math.floor(my / tileSize) + 1
 
 -- 1. CHECK ATTACK FIRST (important!)
-if selectedUnit then
+if selectedUnit and not selectedUnit.hasActed then
     for _, enemy in ipairs(enemyUnits) do
         if enemy.x == tileX and enemy.y == tileY then
             
@@ -115,7 +118,7 @@ if selectedUnit then
                         break
                     end
                 end
-
+                selectedUnit.hasActed = true
                 selectedUnit.hasMoved = true
                 selectedUnit = nil
                 reachable = nil
@@ -138,6 +141,7 @@ for _, unit in ipairs(playerUnits) do
 
         selectedUnit = unit
         reachable, cameFrom = Movement.calculateReachable(unit, terrain)
+        attackable = Movement.calculateAttackable(unit, terrain)
         return
     end
 end
@@ -148,7 +152,7 @@ if selectedUnit and reachable and reachable[tileY] and reachable[tileY][tileX] t
     selectedUnit.pathIndex = 1
     selectedUnit.isMoving = true
 
-    selectedUnit = nil
+    --selectedUnit = nil
     reachable = nil
 end
 end
@@ -183,8 +187,9 @@ function love.update(dt)
             -- Reset Path 
             unit.path = nil 
             unit.hasMoved = true
+            --unit.hasActed = true
             
-            if allUnitsMoved(playerUnits) then
+            if allUnitsFinished(playerUnits) then
                 endTurn()
             end
         end
@@ -199,6 +204,7 @@ end
 function startPlayerTurn()
     for _, unit in ipairs(playerUnits) do
         unit.hasMoved = false
+        unit.hasActed = false
     end
 end
 
@@ -212,9 +218,9 @@ function enemyAct()
     print("Enemy Turn...")
 end
 
-function allUnitsMoved(units)
+function allUnitsFinished(units)
     for _, unit in ipairs(units) do
-        if not unit.hasMoved then
+        if not (unit.hasMoved and unit.hasActed) then
             return false
         end
     end
@@ -297,6 +303,25 @@ end
       end 
     end
   end 
+
+  -- Draw Attack Range 
+  if selectedUnit and attackable then
+    for y = 1, #terrain do
+        for x = 1, #terrain[y] do
+            if attackable[y] and attackable[y][x] then
+                love.graphics.setColor(1, 0, 0, 0.4) -- Red Attack Range, Slightly Transparent
+                love.graphics.rectangle(
+                    "fill",
+                    (x - 1) * tileSize,
+                    (y - 1) * tileSize,
+                    tileSize,
+                    tileSize
+                )
+            end
+        end
+    end
+  end
+
   -- Draw Player Unit
   for _, unit in ipairs(playerUnits) do
       love.graphics.setColor(unit.color)
